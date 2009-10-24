@@ -19,16 +19,16 @@ randomPopulation fitness count = sequence
                                $ replicate count 
                                $ individual >>= return . fitness
 
-mutatePopulation :: (Individual i, Ord f, Show f, RandomGen g) => (i -> Fitness i f) -> Int -> Population i f -> State g (Population i f)
+mutatePopulation :: (Individual i, Show i, Ord f, Show f, RandomGen g) => (i -> Fitness i f) -> Int -> Population i f -> State g (Population i f)
 mutatePopulation fitness generation population = do
     individuals' <- sequence $ replicate (count - 1) $ mutate fittestIndividual
     let population' = parMap rwhnf fitness individuals'
     return (fittest : population')
     where fittest @ (fittestIndividual, fittestScore) = maximumBy (\ (_, a) (_, b) -> compare a b) population
-          message = "Generation " ++ (show generation) ++ ": " ++ (show $ fittestScore)
+          message = "Generation " ++ (show generation) ++ ": " ++ (show $ fittest)
           count = trace message $ length population
 
-evolve :: (Individual i, Ord f, Show f, RandomGen g) => (i -> Fitness i f) -> State g (Fitness i f)
+evolve :: (Individual i, Show i, Ord f, Show f, RandomGen g) => (i -> Fitness i f) -> State g (Fitness i f)
 evolve fitness = do
     initialPopulation <- randomPopulation fitness 100
     finalPopulation <- foldM (flip ($)) initialPopulation 
