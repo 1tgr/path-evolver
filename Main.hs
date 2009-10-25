@@ -1,118 +1,48 @@
 module Main where
 
 import Control.Monad.State.Lazy
-import Path.Evolver.BoundedEnum()
+import Graphics.UI.GLUT
+import List
 import Path.Evolver.Evolution
+import Path.Evolver.Turtle  
 import Random
 
-data Instruction = Forward
-                 | TurnLeft
-                 | TurnRight
-                 deriving (Bounded, Enum, Show)
+displayPath :: [ Location ] -> IO ()
+displayPath ((x1, y1) : (p @ ((x2, y2) : _))) = do
+    vertex $ Vertex2 x1 y1
+    vertex $ Vertex2 x2 y2
+    displayPath p
 
-data Mutation = None
-              | Add
-              | Drop
-              deriving (Bounded, Enum)
+displayPath _ = return ()
 
-data Turtle = Turtle [ Instruction ]
-              deriving (Show)
+display :: Turtle -> IO ()
+display (Turtle instructions) = do
+  	clear [ ColorBuffer, DepthBuffer ]
+  	loadIdentity
+  	renderPrimitive Lines $ displayPath $ path instructions
+  	flush
 
-collapse :: [ Instruction ] -> [ Instruction ]
-collapse (TurnLeft : TurnRight : xs) = collapse xs
-collapse (TurnRight : TurnLeft : xs) = collapse xs
-collapse (x : xs) = x : collapse xs
-collapse [ ] = [ ]
-
-instance Individual Turtle where
-    individual = (sequence $ replicate 10 $ State random) >>= return . Turtle . collapse
-    mutate (Turtle instructions) =
-        mutateInstructions instructions >>= return . Turtle . collapse
-        where mutateInstructions :: RandomGen g => [ Instruction ] -> State g [ Instruction ]
-              mutateInstructions (x : xs) = do
-                  mutation <- State random
-                  x' <- applyMutation x mutation
-                  xs' <- mutateInstructions xs
-                  return $ x' ++ xs'
-
-              mutateInstructions [ ] = do
-                  mutation <- State random
-                  case mutation of
-                      Add -> State random >>= (\i -> return [ i ])
-                      Drop -> return [ ]
-                      None -> return [ ]
-
-              applyMutation :: RandomGen g => Instruction -> Mutation -> State g [ Instruction ]
-              applyMutation i None = return [ i ]
-              applyMutation i Add = State random >>= (\i' -> return [ i, i' ])
-              applyMutation _ Drop = return [ ]
-
-type Location = (Double, Double)
-
-data Direction = North
-               | East
-               | South
-               | West
-
-data TurtleState = TurtleState
-                 {
-                     location :: Location,
-                     direction :: Direction
-                 }
-
-path :: [ Instruction ] -> [ Location ]
-path = (++ [ (0, 0) ])
-     . ((0, 0) : )
-     . (flip evalState) (TurtleState { location = (0, 0), direction = North })
-     . mapM applyInstructionM
-    where applyInstruction :: Instruction -> TurtleState -> TurtleState
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = North } = state { location = (x, y - 1) }
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = East } = state { location = (x + 1, y) }
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = South } = state { location = (x, y + 1) }
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = West } = state { location = (x - 1, y) }
-          applyInstruction TurnLeft state @ TurtleState { direction = North } = state { direction = West }
-          applyInstruction TurnLeft state @ TurtleState { direction = East } = state { direction = North }
-          applyInstruction TurnLeft state @ TurtleState { direction = South } = state { direction = East }
-          applyInstruction TurnLeft state @ TurtleState { direction = West } = state { direction = South }
-          applyInstruction TurnRight state @ TurtleState { direction = North } = state { direction = East }
-          applyInstruction TurnRight state @ TurtleState { direction = East } = state { direction = South }
-          applyInstruction TurnRight state @ TurtleState { direction = South } = state { direction = West }
-          applyInstruction TurnRight state @ TurtleState { direction = West } = state { direction = North }
-
-          applyInstructionM :: Instruction -> State TurtleState Location
-          applyInstructionM instruction = do
-              state <- get
-              let state' @ TurtleState { location = l } = applyInstruction instruction state
-              put state'
-              return l
-
-centre :: [ Location ] -> Location
-centre p = (sumX / pathLength, sumY / pathLength)
-    where (sumX, sumY) = foldl1 (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) p
-          pathLength = fromRational $ toRational $ length p
-
-stats :: (Floating a, Ord a) => [ a ] -> (a, a, a, a, a, a)
-stats (x:xs) = finish . foldl stats' (x, x, x, x*x, 1) $ xs
-  where stats' (mx, mn, s, ss, n) xx = (max xx mx, min xx mn, s + xx, ss + xx * xx, n+1)
-        finish (mx, mn, s, ss, n) = (mx, mn, av, va, stdev, n)
-          where av = s/n
-                va = ss/(n-1) - n*av*av/(n-1)
-                stdev = sqrt va
-
-stats [ ] = error "stats: empty list"
-
-fitness :: Turtle -> Fitness Turtle (Double, Double, Double)
-fitness turtle @ (Turtle instructions) =
-    let p = path instructions
-        square x = x * x
-        (centreX, centreY) = centre p
-        (_, _, av, _, stdev, _) = stats
-                                $ map (\(x, y) -> square (x - centreX) + square (y - centreY))
-                                $ p
-        score = av / (1 + stdev)
-    in (turtle, (score, av, stdev))
+oneGeneration :: (Ord f, RandomGen g) => (Population Turtle f -> State g (Population Turtle f)) -> Population Turtle f -> g -> IO (Population Turtle f, g)
+oneGeneration mutateFunc population g = do
+    let ret @ (population', _) = runState (mutateFunc population) g
+    let fittest = fst $ maximumBy (\ (_, a) (_, b) -> compare a b) $ population'
+    displayCallback $= display fittest
+    postRedisplay Nothing
+    return ret
 
 main :: IO ()
-main =
-    print $ evalState (evolve fitness) 
-          $ mkStdGen 0
+main = do
+    getArgsAndInitialize
+    initialDisplayMode $= [ SingleBuffered, RGBMode, WithDepthBuffer ]
+    createWindow "Path Evolver"
+    clearColor $= Color4 0 0 0 0
+    matrixMode $= Projection
+    loadIdentity
+    ortho (-1) 1 (-1) 1 (-1) 1
+    matrixMode $= Modelview 0
+    foldM (\(p, g) f -> f p g) (runState (randomPopulation fitness 10000) $ mkStdGen 0)
+        $ map oneGeneration
+        $ zipWith (flip ($)) [ 1 .. 1000 ] 
+        $ repeat
+        $ mutatePopulation fitness
+    mainLoop

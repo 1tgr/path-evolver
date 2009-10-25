@@ -1,0 +1,4 @@
+mkdir -p bin obj
+ghc --make -Wall -threaded -o bin/path-evolver -outputdir obj -iHUnit-1.0 *.hs
+bin/path-evolver +RTS -N4
+(Turtle [TurnRight,TurnRight,Forward,TurnRight,Forward,Forward,TurnLeft,Forward,Forward,Forward,Forward,Forward,TurnLeft,Forward,TurnRight,Forward,Forward,TurnLeft,Forward,Forward,Forward,Forward,Forward,Forward,Forward,Forward,TurnLeft,Forward,Forward,Forward,Forward,Forward,Forward,TurnLeft,TurnLeft,Forward,TurnLeft,TurnLeft,Forward,TurnRight,TurnRight],(3.9712022602296435,22.81665765278529,4.7455289752645))
