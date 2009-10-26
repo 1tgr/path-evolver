@@ -10,8 +10,7 @@ data Instruction = Forward
                  | TurnRight
                  deriving (Bounded, Enum, Show)
 
-data Mutation = NoMutation
-              | AddInstruction
+data Mutation = AddInstruction
               | DropInstruction
               deriving (Bounded, Enum)
 
@@ -40,10 +39,8 @@ instance Individual Turtle where
                   case mutation of
                       AddInstruction -> State random >>= (\i -> return [ i ])
                       DropInstruction -> return [ ]
-                      NoMutation -> return [ ]
 
               applyMutation :: RandomGen g => Instruction -> Mutation -> State g [ Instruction ]
-              applyMutation i NoMutation = return [ i ]
               applyMutation i AddInstruction = State random >>= (\i' -> return [ i, i' ])
               applyMutation _ DropInstruction = return [ ]
 
