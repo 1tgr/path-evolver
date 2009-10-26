@@ -18,7 +18,7 @@ display generation (Turtle instructions, score) = do
   	    $ mapM_ (\(x, y) -> vertex $ Vertex2 x y)
   	    $ path
   	    $ instructions
-  	currentRasterPosition $= Vertex4 (-49) (-49) 0 1
+  	currentRasterPosition $= Vertex4 (-24) (-25) 0 1
   	renderString Helvetica10 $ "Generation " ++ (show generation) ++ " " ++ (show score)
   	flush
 
@@ -38,7 +38,7 @@ main = do
     clearColor $= Color4 0 0 0 0
     matrixMode $= Projection
     loadIdentity
-    ortho2D (-50) 50 (-50) 50
+    ortho2D (-25) 25 (-25) 25
     matrixMode $= Modelview 0
     let (population, g) = runState (randomPopulation fitness 100) $ mkStdGen 0
     displayCallback $= (display 1 $ fittest population)
