@@ -17,16 +17,10 @@ data Mutation = AddInstruction
 data Turtle = Turtle [ Instruction ]
               deriving (Show)
 
-collapse :: [ Instruction ] -> [ Instruction ]
-collapse (TurnLeft : TurnRight : xs) = collapse xs
-collapse (TurnRight : TurnLeft : xs) = collapse xs
-collapse (x : xs) = x : collapse xs
-collapse [ ] = [ ]
-
 instance Individual Turtle where
-    individual = (sequence $ replicate 10 $ State random) >>= return . Turtle . collapse
+    individual = (sequence $ replicate 10 $ State random) >>= return . Turtle
     mutate (Turtle instructions) =
-        mutateInstructions instructions >>= return . Turtle . collapse
+        mutateInstructions instructions >>= return . Turtle
         where mutateInstructions :: RandomGen g => [ Instruction ] -> State g [ Instruction ]
               mutateInstructions (x : xs) = do
                   mutation <- State random
@@ -46,35 +40,22 @@ instance Individual Turtle where
 
 type Location = (Double, Double)
 
-data Direction = North
-               | East
-               | South
-               | West
-
 data TurtleState = TurtleState
                  {
                      location :: Location,
-                     direction :: Direction
+                     direction :: Double
                  }
 
 path :: [ Instruction ] -> [ Location ]
 path = (++ [ (0, 0) ])
      . ((0, 0) : )
-     . (flip evalState) (TurtleState { location = (0, 0), direction = North })
+     . (flip evalState) (TurtleState { location = (0, 0), direction = 0 })
      . mapM applyInstructionM
     where applyInstruction :: Instruction -> TurtleState -> TurtleState
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = North } = state { location = (x, y - 1) }
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = East } = state { location = (x + 1, y) }
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = South } = state { location = (x, y + 1) }
-          applyInstruction Forward state @ TurtleState { location = (x, y), direction = West } = state { location = (x - 1, y) }
-          applyInstruction TurnLeft state @ TurtleState { direction = North } = state { direction = West }
-          applyInstruction TurnLeft state @ TurtleState { direction = East } = state { direction = North }
-          applyInstruction TurnLeft state @ TurtleState { direction = South } = state { direction = East }
-          applyInstruction TurnLeft state @ TurtleState { direction = West } = state { direction = South }
-          applyInstruction TurnRight state @ TurtleState { direction = North } = state { direction = East }
-          applyInstruction TurnRight state @ TurtleState { direction = East } = state { direction = South }
-          applyInstruction TurnRight state @ TurtleState { direction = South } = state { direction = West }
-          applyInstruction TurnRight state @ TurtleState { direction = West } = state { direction = North }
+          applyInstruction Forward state @ TurtleState { location = (x, y), direction = d } = state { location = (x + sin d, y + cos d) }
+          applyInstruction TurnLeft state @ TurtleState { direction = d } = state { direction = d - dd }
+          applyInstruction TurnRight state @ TurtleState { direction = d } = state { direction = d + dd }
+          dd = (2 * pi) / 10
 
           applyInstructionM :: Instruction -> State TurtleState Location
           applyInstructionM instruction = do
